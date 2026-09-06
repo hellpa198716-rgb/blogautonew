@@ -3,7 +3,7 @@ import feedparser
 import requests
 from ai_client import generate_article_data
 from image_service import get_unsplash_image, upload_image_to_wordpress
-from wordpress_client import post_to_wordpress
+from wordpress import post_to_wordpress
 
 # 기사 수집 중복 방지 파일
 POSTED_URLS_FILE = "posted_urls.txt"
