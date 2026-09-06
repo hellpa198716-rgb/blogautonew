@@ -11,12 +11,11 @@ def generate_article_data(title, summary):
 
     genai.configure(api_key=api_key)
 
-    # 404 에러 방지를 위해 호환 모델명 지정 (gemini-1.5-flash-latest 또는 gemini-2.0-flash)
+    # Gemini 3.6 Flash 모델 적용
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash-latest",
+        model_name="gemini-3.6-flash",
         system_instruction=SYSTEM_PROMPT,
         generation_config={
-            "temperature": 0.3,
             "response_mime_type": "application/json"
         }
     )
