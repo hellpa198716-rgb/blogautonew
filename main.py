@@ -1,66 +1,72 @@
 import os
-import random
-import time
-from google_research import fetch_latest_news
+import feedparser
+import requests
 from ai_client import generate_article_data
 from image_service import get_unsplash_image, upload_image_to_wordpress
-from wordpress import publish_to_wordpress
+from wordpress_client import post_to_wordpress
 
-HISTORY_FILE = "posted_urls.txt"
+# 기사 수집 중복 방지 파일
+POSTED_URLS_FILE = "posted_urls.txt"
 
-def load_history():
-    if not os.path.exists(HISTORY_FILE):
-        return set()
-    with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-        return set(line.strip() for line in f if line.strip())
+def load_posted_urls():
+    if os.path.exists(POSTED_URLS_FILE):
+        with open(POSTED_URLS_FILE, "r", encoding="utf-8") as f:
+            return set(line.strip() for line in f if line.strip())
+    return set()
 
-def save_history(link):
-    with open(HISTORY_FILE, "a", encoding="utf-8") as f:
-        f.write(link + "\n")
+def save_posted_url(url):
+    with open(POSTED_URLS_FILE, "a", encoding="utf-8") as f:
+        f.write(f"{url}\n")
+
+def fetch_latest_news():
+    # 구글 뉴스 RSS (한국 트렌드)
+    rss_url = "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko"
+    feed = feedparser.parse(rss_url)
+    return feed.entries
 
 def main():
-    # 스팸 알고리즘 회피를 위한 랜덤 실행 지연 (1분 ~ 15분 무작위 대기)
-    random_delay = random.randint(60, 900)
-    print(f"알고리즘 보호를 위해 {random_delay}초 후 포스팅 프로세스를 시작합니다...")
-    time.sleep(random_delay)
+    posted_urls = load_posted_urls()
+    news_entries = fetch_latest_news()
 
-    print("최신 이슈 수집 중...")
-    news_list = fetch_latest_news()
-    if not news_list:
-        print("수집된 뉴스가 없습니다.")
+    target_entry = None
+    for entry in news_entries:
+        if entry.link not in posted_urls:
+            target_entry = entry
+            break
+
+    if not target_entry:
+        print("새롭게 포스팅할 신규 뉴스 기사가 없습니다.")
         return
 
-    posted_urls = load_history()
-    fresh_news = [n for n in news_list if n["link"] not in posted_urls]
-    
-    if not fresh_news:
-        print("신규 이슈가 없습니다.")
-        return
+    print(f"새 기사 수집 완료: {target_entry.title}")
 
-    # 하루 1~2회 실행 스케줄에서 무작위 1개만 선별 발행
-    selected_news = random.choice(fresh_news)
-    print(f"타겟 뉴스: {selected_news['title']}")
-    
-    # 1. AI 기반 SEO 글 생성
-    article_data = generate_article_data(selected_news["title"], selected_news["summary"])
+    # 1. Gemini AI를 통한 아티클 데이터 생성 (제목, 본문, category_id, search_keyword)
+    article_data = generate_article_data(target_entry.title, target_entry.get("summary", ""))
     if not article_data:
-        print("기사 생성 실패")
+        print("AI 아티클 생성 실패로 프로세스를 종료합니다.")
         return
 
-    focus_keyword = article_data.get("focus_keyword", "뉴스")
-    
-    # 2. 이미지 처리 (썸네일 및 본문 이미지)
-    wp_url = os.getenv("WP_URL")
-    wp_user = os.getenv("WP_USER")
-    wp_pass = os.getenv("WP_APP_PASSWORD")
-    
-    img_url = get_unsplash_image(focus_keyword)
-    media_id, uploaded_url = upload_image_to_wordpress(img_url, focus_keyword, wp_url, wp_user, wp_pass)
+    # 2. Unsplash 이미지 가져오기 및 워드프레스 미디어 업로드
+    media_id = None
+    search_keyword = article_data.get("search_keyword", "news")
+    image_url = get_unsplash_image(search_keyword)
 
-    # 3. 워드프레스 발행
-    success = publish_to_wordpress(article_data, featured_media_id=media_id, body_image_url=uploaded_url)
+    if image_url:
+        wp_url = os.getenv("WP_URL")
+        wp_user = os.getenv("WP_USER")
+        wp_app_pass = os.getenv("WP_APP_PASS")
+        alt_text = article_data.get("title", "Featured Image")
+        
+        media_id = upload_image_to_wordpress(image_url, wp_url, wp_user, wp_app_pass, alt_text=alt_text)
+
+    # 3. 워드프레스에 게시글 최종 전송
+    success = post_to_wordpress(article_data, media_id=media_id)
+
     if success:
-        save_history(selected_news["link"])
+        save_posted_url(target_entry.link)
+        print("성공적으로 새 아티클이 발행되고 중복 URL 목록에 등록되었습니다.")
+    else:
+        print("워드프레스 포스팅 실패")
 
 if __name__ == "__main__":
     main()
