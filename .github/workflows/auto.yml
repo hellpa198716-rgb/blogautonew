@@ -4,7 +4,6 @@ name: High-Quality Automated Publisher
 on:
   workflow_dispatch:
   schedule:
-    # 하루 2회 실행 (UTC 기준 오전 0시, 오후 12시 -> 한국 시간 기준 오전 9시, 밤 10시)
     - cron: '0 0,12 * * *'
 
 jobs:
@@ -33,7 +32,7 @@ jobs:
         WP_URL: ${{ secrets.WP_URL }}
         WP_USER: ${{ secrets.WP_USER }}
         WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} # 또는 GEMINI_API_KEY
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: |
         python main.py
 
