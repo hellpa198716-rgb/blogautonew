@@ -1,31 +1,35 @@
-# ai_client.py
 import os
 import json
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 from prompts import SYSTEM_PROMPT, get_article_prompt
 
-def generate_article_data(title, source_text):
+def generate_article_data(title, summary):
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        raise ValueError("GEMINI_API_KEY가 설정되지 않았습니다.")
+        print("GEMINI_API_KEY가 설정되지 않았습니다.")
+        return None
 
-    client = genai.Client(api_key=api_key)
-    prompt = get_article_prompt(title, source_text)
-
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            temperature=0.3,
-            response_mime_type="application/json"
-        ),
+    genai.configure(api_key=api_key)
+    
+    # temperature=0.3으로 낮은 환각율 및 팩트 데이터 생성 고정
+    generation_config = genai.GenerationConfig(
+        temperature=0.3,
+        response_mime_type="application/json"
+    )
+    
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        system_instruction=SYSTEM_PROMPT
     )
 
+    prompt = get_article_prompt(title, summary)
+    
     try:
-        data = json.loads(response.text)
-        return data
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
+        return json.loads(response.text)
     except Exception as e:
-        print(f"JSON 파싱 실패: {e}")
+        print(f"AI 콘텐츠 생성 실패: {e}")
         return None
