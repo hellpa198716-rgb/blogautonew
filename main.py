@@ -40,7 +40,7 @@ def main():
 
     print(f"새 기사 수집 완료: {target_entry.title}")
 
-    # 1. Gemini AI를 통한 아티클 데이터 생성 (제목, 본문, category_id, search_keyword)
+    # 1. Gemini AI를 통한 아티클 데이터 생성
     article_data = generate_article_data(target_entry.title, target_entry.get("summary", ""))
     if not article_data:
         print("AI 아티클 생성 실패로 프로세스를 종료합니다.")
@@ -52,13 +52,13 @@ def main():
     image_url = get_unsplash_image(search_keyword)
 
     if image_url:
-        # os.getenv 안의 이름이 Secret 이름과 완벽히 일치해야 합니다.
         wp_url = os.getenv("WP_URL")
         wp_user = os.getenv("WP_USER")
         wp_password = os.getenv("WP_APP_PASSWORD")
         alt_text = article_data.get("title", "Featured Image")
         
-        media_id = upload_image_to_wordpress(image_url, wp_url, wp_user, wp_app_pass, alt_text=alt_text)
+        # [수정 위치] wp_app_pass -> wp_password 로 변수명 오타 수정
+        media_id = upload_image_to_wordpress(image_url, wp_url, wp_user, wp_password, alt_text=alt_text)
 
     # 3. 워드프레스에 게시글 최종 전송
     success = post_to_wordpress(article_data, media_id=media_id)
