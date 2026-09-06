@@ -2,4 +2,4 @@
 requests
 feedparser
 beautifulsoup4
-openai
+google-genai
