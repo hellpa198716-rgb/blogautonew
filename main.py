@@ -5,7 +5,6 @@ from ai_client import generate_article_data
 from image_service import get_unsplash_image, upload_image_to_wordpress
 from wordpress import post_to_wordpress
 
-# 기사 수집 중복 방지 파일
 POSTED_URLS_FILE = "posted_urls.txt"
 
 def load_posted_urls():
@@ -19,7 +18,6 @@ def save_posted_url(url):
         f.write(f"{url}\n")
 
 def fetch_latest_news():
-    # 구글 뉴스 RSS (한국 트렌드)
     rss_url = "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko"
     feed = feedparser.parse(rss_url)
     return feed.entries
@@ -40,27 +38,36 @@ def main():
 
     print(f"새 기사 수집 완료: {target_entry.title}")
 
-    # 1. Gemini AI를 통한 아티클 데이터 생성
+    # 1. AI 아티클 생성
     article_data = generate_article_data(target_entry.title, target_entry.get("summary", ""))
     if not article_data:
         print("AI 아티클 생성 실패로 프로세스를 종료합니다.")
         return
 
-    # 2. Unsplash 이미지 가져오기 및 워드프레스 미디어 업로드
+    wp_url = os.getenv("WP_URL")
+    wp_user = os.getenv("WP_USER")
+    wp_password = os.getenv("WP_APP_PASSWORD")
+
+    # 2. 대표 이미지 업로드 및 본문 중간 이미지 구성
     media_id = None
     search_keyword = article_data.get("search_keyword", "news")
     image_url = get_unsplash_image(search_keyword)
 
-    if image_url:
-        wp_url = os.getenv("WP_URL")
-        wp_user = os.getenv("WP_USER")
-        wp_password = os.getenv("WP_APP_PASSWORD")
+    if image_url and wp_url:
         alt_text = article_data.get("title", "Featured Image")
-        
-        # [수정 위치] wp_app_pass -> wp_password 로 변수명 오타 수정
+        # 워드프레스 미디어 라이브러리에 업로드 및 media_id 획득
         media_id = upload_image_to_wordpress(image_url, wp_url, wp_user, wp_password, alt_text=alt_text)
+        
+        # 본문 상단/중간에 이미지 태그 예쁘게 삽입 (SEO alt 태그 포함)
+        inline_img_html = f'''
+        <div style="text-align: center; margin: 20px 0;">
+            <img src="{image_url}" alt="{alt_text}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" />
+        </div>
+        '''
+        # 기존 본문에 이미지 태그 추가
+        article_data["content"] = inline_img_html + article_data.get("content", "")
 
-    # 3. 워드프레스에 게시글 최종 전송
+    # 3. 워드프레스 최종 포스팅 전송
     success = post_to_wordpress(article_data, media_id=media_id)
 
     if success:
