@@ -52,9 +52,10 @@ def main():
     image_url = get_unsplash_image(search_keyword)
 
     if image_url:
+        # os.getenv 안의 이름이 Secret 이름과 완벽히 일치해야 합니다.
         wp_url = os.getenv("WP_URL")
         wp_user = os.getenv("WP_USER")
-        wp_app_pass = os.getenv("WP_APP_PASS")
+        wp_password = os.getenv("WP_APP_PASSWORD")
         alt_text = article_data.get("title", "Featured Image")
         
         media_id = upload_image_to_wordpress(image_url, wp_url, wp_user, wp_app_pass, alt_text=alt_text)
