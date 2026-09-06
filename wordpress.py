@@ -1,6 +1,41 @@
 import os
 import requests
 
+def get_or_create_tag_ids(tags, wp_url, wp_user, wp_password):
+    """문자열 태그 목록을 워드프레스 태그 ID(integer) 목록으로 변환"""
+    if not tags or not isinstance(tags, list):
+        return []
+
+    tag_ids = []
+    headers = {"Content-Type": "application/json"}
+    auth = (wp_user, wp_password)
+    tag_api_url = f"{wp_url.rstrip('/')}/wp-json/wp/v2/tags"
+
+    for tag_name in tags:
+        tag_name = str(tag_name).strip()
+        if not tag_name:
+            continue
+            
+        try:
+            # 1. 기존 태그 검색
+            res = requests.get(tag_api_url, params={"search": tag_name}, auth=auth)
+            if res.status_code == 200 and res.json():
+                # 정확히 이름이 일치하는 태그 찾기
+                matched = next((t for t in res.json() if t["name"].lower() == tag_name.lower()), None)
+                if matched:
+                    tag_ids.append(matched["id"])
+                    continue
+
+            # 2. 존재하지 않으면 새 태그 생성
+            create_res = requests.post(tag_api_url, json={"name": tag_name}, auth=auth, headers=headers)
+            if create_res.status_code in [200, 201]:
+                tag_ids.append(create_res.json()["id"])
+        except Exception as e:
+            print(f"태그 처리 중 오류 ('{tag_name}'): {e}")
+
+    return tag_ids
+
+
 def post_to_wordpress(article_data, media_id=None):
     wp_url = os.getenv("WP_URL")
     wp_user = os.getenv("WP_USER")
@@ -11,18 +46,17 @@ def post_to_wordpress(article_data, media_id=None):
         return False
 
     api_url = f"{wp_url.rstrip('/')}/wp-json/wp/v2/posts"
+    headers = {"Content-Type": "application/json"}
     
-    headers = {
-        "Content-Type": "application/json"
-    }
-    
-    # article_data 딕셔너리 데이터 추출
     title = article_data.get("title", "")
     content = article_data.get("content", "")
     excerpt = article_data.get("excerpt") or article_data.get("meta_description", "")
     category_id = article_data.get("category_id")
-    tags = article_data.get("tags", [])
+    raw_tags = article_data.get("tags", [])
     slug = article_data.get("slug", "")
+
+    # 문자열 태그 목록을 워드프레스 Tag ID(숫자) 목록으로 변환
+    tag_ids = get_or_create_tag_ids(raw_tags, wp_url, wp_user, wp_password)
 
     payload = {
         "title": title,
@@ -34,18 +68,17 @@ def post_to_wordpress(article_data, media_id=None):
     if slug:
         payload["slug"] = slug
 
-    # SEO 핵심: 카테고리 및 태그 지정
     if category_id:
         payload["categories"] = [int(category_id)]
     
-    if tags and isinstance(tags, list):
-        payload["tags"] = tags
+    # 숫자 ID 형태의 태그 배열 전달
+    if tag_ids:
+        payload["tags"] = tag_ids
 
-    # SEO 핵심: 대표 이미지(Featured Media) 지정
     if media_id:
         payload["featured_media"] = int(media_id)
 
-    # Rank Math / Yoast SEO 플러그인 호환 메타 데이터 추가
+    # SEO 메타데이터 (Rank Math / Yoast SEO)
     meta_desc = article_data.get("meta_description", "")
     focus_kw = article_data.get("focus_keyword", "")
     if meta_desc or focus_kw:
@@ -65,7 +98,7 @@ def post_to_wordpress(article_data, media_id=None):
             headers=headers
         )
         
-        if response.status_code == 201:
+        if response.status_code in [200, 201]:
             print("워드프레스 고품질 SEO 포스팅 성공!")
             return True
         else:
