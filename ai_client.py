@@ -13,7 +13,7 @@ def generate_article_content(title, source_text):
     prompt = get_article_prompt(title, source_text)
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.6-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
