@@ -1,6 +1,7 @@
 import os
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from prompts import SYSTEM_PROMPT, get_article_prompt
 
 def generate_article_data(title, summary):
@@ -9,25 +10,18 @@ def generate_article_data(title, summary):
         print("GEMINI_API_KEY가 설정되지 않았습니다.")
         return None
 
-    genai.configure(api_key=api_key)
-    
-    # temperature=0.3으로 낮은 환각율 및 팩트 데이터 생성 고정
-    generation_config = genai.GenerationConfig(
-        temperature=0.3,
-        response_mime_type="application/json"
-    )
-    
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        system_instruction=SYSTEM_PROMPT
-    )
-
+    client = genai.Client(api_key=api_key)
     prompt = get_article_prompt(title, summary)
-    
+
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config=generation_config
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                temperature=0.3,
+                response_mime_type="application/json"
+            )
         )
         return json.loads(response.text)
     except Exception as e:
