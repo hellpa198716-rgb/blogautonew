@@ -1,7 +1,7 @@
 import os
 import requests
 
-def post_to_wordpress(title, content, image_url=None):
+def post_to_wordpress(article_data, media_id=None):
     wp_url = os.getenv("WP_URL")
     wp_user = os.getenv("WP_USER")
     wp_password = os.getenv("WP_APP_PASSWORD")
@@ -10,18 +10,30 @@ def post_to_wordpress(title, content, image_url=None):
         print("워드프레스 인증 정보가 누락되었습니다.")
         return False
 
-    # 워드프레스 API 엔드포인트 설정
     api_url = f"{wp_url.rstrip('/')}/wp-json/wp/v2/posts"
     
     headers = {
         "Content-Type": "application/json"
     }
     
+    # article_data 딕셔너리에서 값 추출
+    title = article_data.get("title", "")
+    content = article_data.get("content", "")
+    category_id = article_data.get("category_id")
+
     payload = {
         "title": title,
         "content": content,
-        "status": "publish"  # 바로 발행하려면 publish, 임시저장은 draft
+        "status": "publish"  # 즉시 발행
     }
+
+    # 카테고리가 전달된 경우 추가
+    if category_id:
+        payload["categories"] = [category_id]
+
+    # 업로드된 미디어(이미지) ID가 있는 경우 대표 이미지(Featured Image)로 지정
+    if media_id:
+        payload["featured_media"] = media_id
 
     try:
         response = requests.post(
