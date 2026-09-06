@@ -2,9 +2,9 @@ import os
 import requests
 
 def post_to_wordpress(article_data, media_id=None):
-    wp_url = os.getenv("WP_URL")
-    wp_user = os.getenv("WP_USER")
-    wp_app_pass = os.getenv("WP_APP_PASS")
+wp_url = os.getenv("WP_URL")
+wp_user = os.getenv("WP_USER")
+wp_password = os.getenv("WP_APP_PASSWORD")
 
     if not all([wp_url, wp_user, wp_app_pass]):
         print("워드프레스 인증 정보가 누락되었습니다.")
