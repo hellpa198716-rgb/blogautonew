@@ -1,9 +1,9 @@
-# .github/workflows/auto.yml
 name: High-Quality Automated Publisher
 
 on:
   workflow_dispatch:
   schedule:
+    # 한국 시간 기준 오전 9시, 오후 9시 무렵 하루 2회 실행
     - cron: '0 0,12 * * *'
 
 jobs:
@@ -27,12 +27,13 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    - name: Run high-quality automation script
+    - name: Run automation script
       env:
         WP_URL: ${{ secrets.WP_URL }}
         WP_USER: ${{ secrets.WP_USER }}
         WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
       run: |
         python main.py
 
