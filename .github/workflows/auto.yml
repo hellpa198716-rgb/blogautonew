@@ -3,10 +3,9 @@ name: High-Quality Automated Publisher
 on:
   workflow_dispatch:
   schedule:
-    # 한국 시간(UTC+9) 기준 약 오전 8시, 오후 2시, 오후 8시 무렵 실행 (UTC 기준 23시, 05시, 11시)
-    - cron: '17 23 * * *'
-    - cron: '42 5 * * *'
-    - cron: '05 11 * * *'
+    # 한국 시간(UTC+9) 기준 오전 11시 20분, 오후 8시 20분 실행 (UTC 기준 02:20, 11:20)
+    - cron: '20 2 * * *'
+    - cron: '20 11 * * *'
 
 jobs:
   build-and-deploy:
@@ -29,7 +28,7 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    - name: Run automation script with Random Sleep
+    - name: Run automation script with Random Delay
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
@@ -37,14 +36,14 @@ jobs:
         WP_USER: ${{ secrets.WP_USER }}
         WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
       run: |
-        # 사람처럼 보이도록 1초~30분(1800초) 사이의 무작위 대기 후 실행
-        python -c "import time, random; sleep_time = random.randint(1, 1800); print(f'Random delay for {sleep_time} seconds...'); time.sleep(sleep_time)"
+        # 검색 피크 타임 내에서 자연스럽게 보이도록 1초~15분(900초) 사이의 무작위 대기 후 실행
+        python -c "import time, random; sleep_time = random.randint(1, 900); print(f'Random delay for {sleep_time} seconds...'); time.sleep(sleep_time)"
         python main.py
 
     - name: Commit posted history
       run: |
         git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.net"
+        git config --global user.email "github-actions[bot]"
         git add posted_urls.txt
         git commit -m "chore: update posted article history" || echo "No changes to commit"
         git push
