@@ -17,7 +17,7 @@ def save_posted_url(url):
         f.write(f"{url}\n")
 
 def fetch_latest_topics():
-    # 단순 뉴스 대신 검색 수명이 길고 경쟁률이 낮아 상위 노출에 유리한 키워드 타깃 피드 수집
+    # 검색 수명이 길고 경쟁률이 낮은 정보형 검색 키워드 타깃 RSS 수집
     rss_urls = [
         "https://news.google.com/rss/search?q=%EC%8B%A0%EC%B2%AD+%EB%B0%A9%EB%B2%95+%EC%9E%90%EA%B2%A9+%ED%99%98%EA%B8%89%EA%B8%88&hl=ko&gl=KR&ceid=KR:ko",
         "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko"
@@ -58,7 +58,7 @@ def main():
 
     print(f"새로운 가이드 주제 수집 완료: {target_entry.title}")
 
-    # 1. 정보형 장문 가이드 생성 (prompts.py 연동)
+    # 1. 정보형 장문 가이드 생성 (prompts.py)
     article_data = generate_article_data(target_entry.title, target_entry.get("summary", ""))
     if not article_data:
         print("AI 아티클 생성 실패로 프로세스를 종료합니다.")
@@ -78,7 +78,7 @@ def main():
         media_id = upload_image_to_wordpress(image_url, wp_url, wp_user, wp_password, alt_text=alt_text)
         article_data["content"] = insert_inline_image(article_data["content"], image_url, alt_text)
 
-    # 3. 워드프레스 발행 (wordpress.py 연동: 카테고리 매핑 + 트렌드 이슈 ID=1 포함)
+    # 3. 워드프레스 포스팅 (wordpress.py)
     success = post_to_wordpress(article_data, media_id=media_id)
 
     if success:
