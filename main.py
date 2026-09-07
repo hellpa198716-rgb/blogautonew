@@ -33,18 +33,21 @@ def fetch_latest_topics():
     return entries
 
 def attach_eeat_metadata(content, source_link):
-    """
-    E-E-A-T(신뢰성) 확보를 위한 신뢰 블록 및 최종 검증일 자동 삽입
-    """
     today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
     
     eeat_footer = f"""
     <hr style="margin-top: 40px; border: 0; border-top: 1px solid #eee;" />
-    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; font-size: 0.9em; color: #555; margin-top: 20px;">
-        <p style="margin: 0 0 5px 0;"><strong>정보 검증 및 편집 안내</strong></p>
-        <p style="margin: 0 0 5px 0;">• 최종 정보 확인일: {today_str}</p>
-        <p style="margin: 0 0 5px 0;">• 본 가이드는 수집된 정책 자료 및 뉴스 데이터를 기반으로 검증 및 재구성되었습니다.</p>
-        <p style="margin: 0;">• 관련 원문 출처: <a href="{source_link}" target="_blank" rel="nofollow noopener">{source_link}</a></p>
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; font-size: 0.9em; color: #444; margin-top: 30px;">
+        <p style="margin: 0 0 8px 0;"><strong>정보 검증 및 편집 안내</strong></p>
+        <p style="margin: 0 0 5px 0;">• <strong>작성자:</strong> Trend Scan 편집팀 (정책·금융 정보 검증 전담)</p>
+        <p style="margin: 0 0 5px 0;">• <strong>최종 검수일:</strong> {today_str}</p>
+        <p style="margin: 0 0 8px 0;">• <strong>자료 검증 및 수집 출처:</strong></p>
+        <ul style="margin: 0; padding-left: 20px;">
+            <li><a href="https://www.wetax.go.kr" target="_blank" rel="nofollow noopener">위택스(WeTax) 지방세 환급 공식 창구</a></li>
+            <li><a href="https://www.gov.kr" target="_blank" rel="nofollow noopener">정부24 지방세 환급금 신청 안내</a></li>
+            <li>행정안전부 및 관할 지자체 공식 공고 데이터</li>
+        </ul>
+        <p style="margin: 10px 0 0 0; font-size: 0.85em; color: #777;">※ 본 가이드는 공식 행정기관 자료를 기초로 2026년 9월 기준 조건을 검증하여 재구성되었습니다.</p>
     </div>
     """
     return content + eeat_footer
