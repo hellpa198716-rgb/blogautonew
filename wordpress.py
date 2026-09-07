@@ -1,32 +1,45 @@
 import os
 import requests
 
-def get_or_create_category_id(category_name, wp_url, wp_user, wp_password):
-    """카테고리 이름을 기반으로 워드프레스 카테고리 ID를 조회하거나 생성"""
-    if not category_name:
-        return None
+def get_category_id_by_name(category_name, wp_url, wp_user, wp_password):
+    """
+    기존 워드프레스 카테고리 이름을 매핑하여 해당 ID를 반환
+    """
+    # 사용자가 변경 요청한 카테고리 매핑 테이블
+    category_map = {
+        "정부지원금·복지": ["정부지원금·복지", "경제·IT", "경제", "복지"],
+        "생활·금융정보": ["생활·금융정보", "생활·트렌드", "생활", "금융"],
+        "IT·디지털팁": ["IT·디지털팁", "시사·사회", "IT", "디지털"]
+    }
+    
+    target_name = category_name.strip() if category_name else "생활·금융정보"
     
     auth = (wp_user, wp_password)
     cat_api_url = f"{wp_url.rstrip('/')}/wp-json/wp/v2/categories"
     
     try:
-        # 기존 카테고리 조회
-        res = requests.get(cat_api_url, params={"search": category_name}, auth=auth)
+        res = requests.get(cat_api_url, params={"per_page": 100}, auth=auth)
         if res.status_code == 200 and res.json():
-            for cat in res.json():
-                if cat["name"].strip().lower() == category_name.strip().lower():
+            wp_categories = res.json()
+            
+            # 1. 매핑 테이블 기반 ID 찾기
+            for key, aliases in category_map.items():
+                if target_name in aliases or key == target_name:
+                    for cat in wp_categories:
+                        if cat["name"].strip() in aliases:
+                            return cat["id"]
+            
+            # 2. 직접 일치하는 이름 찾기
+            for cat in wp_categories:
+                if cat["name"].strip().lower() == target_name.lower():
                     return cat["id"]
-        
-        # 없으면 신규 생성
-        create_res = requests.post(cat_api_url, json={"name": category_name}, auth=auth)
-        if create_res.status_code in [200, 201]:
-            return create_res.json()["id"]
     except Exception as e:
-        print(f"카테고리 처리 중 오류: {e}")
-    
+        print(f"카테고리 ID 조회 중 오류: {e}")
+        
     return None
 
 def get_or_create_tag_ids(tags, wp_url, wp_user, wp_password):
+    """문자열 태그를 워드프레스 태그 ID 배열로 변환"""
     if not tags or not isinstance(tags, list):
         return []
 
@@ -61,7 +74,7 @@ def post_to_wordpress(article_data, media_id=None):
     wp_password = os.getenv("WP_APP_PASSWORD")
 
     if not all([wp_url, wp_user, wp_password]):
-        print("워드프레스 인증 정보가 누락되었습니다.")
+        print("워드프레스 인증 정보 누락")
         return False
 
     api_url = f"{wp_url.rstrip('/')}/wp-json/wp/v2/posts"
@@ -73,13 +86,18 @@ def post_to_wordpress(article_data, media_id=None):
     focus_kw = article_data.get("focus_keyword", "")
     slug = article_data.get("slug", "")
     
-    # 카테고리 명칭을 ID로 자동 변환
-    category_name = article_data.get("category_name", "일반")
-    category_id = get_or_create_category_id(category_name, wp_url, wp_user, wp_password)
+    # 1. 기존 카테고리 ID 매핑 조회
+    category_name = article_data.get("category_name", "생활·금융정보")
+    matched_cat_id = get_category_id_by_name(category_name, wp_url, wp_user, wp_password)
 
-    # SEO 내/외부 링크 보완 (콘텐츠 하단에 자동 추가)
-    external_link = f'<p style="margin-top:30px; font-size:0.9em; color:#666;">참고 출처: <a href="https://news.google.com" target="_blank" rel="dofollow">Google News</a></p>'
-    internal_link = f'<p style="font-size:0.9em; color:#666;">관련 글 더보기: <a href="{wp_url.rstrip("/")}">블로그 홈으로 이동</a></p>'
+    # 2. 카테고리 리스트 구성 (요청사항: '트렌드 이슈' ID=1 필수 포함)
+    categories = [1]  # 트렌드 이슈 (category_id / tag_id = 1) 기본 포함
+    if matched_cat_id and matched_cat_id != 1:
+        categories.append(matched_cat_id)
+
+    # SEO 내/외부 링크 자동 삽입
+    external_link = f'<p style="margin-top:30px; font-size:0.9em; color:#666;">공식 세부 정보 확인: <a href="https://www.gov.kr" target="_blank" rel="dofollow">정부24 공식 홈페이지</a></p>'
+    internal_link = f'<p style="font-size:0.9em; color:#666;">관련 가이드 더보기: <a href="{wp_url.rstrip("/")}">블로그 메인으로 이동</a></p>'
     content += f"\n{external_link}\n{internal_link}"
 
     tag_ids = get_or_create_tag_ids(article_data.get("tags", []), wp_url, wp_user, wp_password)
@@ -88,22 +106,20 @@ def post_to_wordpress(article_data, media_id=None):
         "title": title,
         "content": content,
         "excerpt": meta_desc,
-        "status": "publish"
+        "status": "publish",
+        "categories": categories
     }
 
     if slug:
         payload["slug"] = slug
 
-    if category_id:
-        payload["categories"] = [category_id]
-    
     if tag_ids:
         payload["tags"] = tag_ids
 
     if media_id:
         payload["featured_media"] = int(media_id)
 
-    # Rank Math & Yoast SEO 메타 설정
+    # Rank Math 및 Yoast SEO 메타 설정
     if meta_desc or focus_kw:
         payload["meta"] = {
             "rank_math_title": title,
@@ -116,11 +132,11 @@ def post_to_wordpress(article_data, media_id=None):
     try:
         response = requests.post(api_url, json=payload, auth=(wp_user, wp_password), headers=headers)
         if response.status_code in [200, 201]:
-            print("워드프레스 고품질 SEO 포스팅 성공!")
+            print("워드프레스 정보형 SEO 포스팅 성공!")
             return True
         else:
             print(f"포스팅 실패 (상태 코드 {response.status_code}): {response.text}")
             return False
     except Exception as e:
-        print(f"워드프레스 연동 오류: {e}")
+        print(f"워드프레스 포스팅 예외 발생: {e}")
         return False
