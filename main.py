@@ -143,7 +143,8 @@ def main():
     # 3. 이미지 수집 및 삽입 (실무형 문서/작업 키워드)
     media_id = None
     raw_keyword = article_data.get("search_keyword", "official document")
-    search_keyword = f"{raw_keyword} document paperwork computer desk"
+    base_keyword = article_data.get("search_keyword", "document")
+    search_keyword = f"{base_keyword} office" if base_keyword else "office desk"
     alt_text = article_data.get("focus_keyword", article_data.get("title", "Guide Image"))
     
     image_urls = get_multiple_unsplash_images(search_keyword, count=2)
