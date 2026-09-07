@@ -17,7 +17,7 @@ def generate_article_data(title, summary="", source_url=""):
 
     # Gemini 모델 설정 (실제 존재하는 gemini-1.5-flash 모델로 변경)
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-3.6-flash",
         system_instruction=system_prompt,
         generation_config={"response_mime_type": "application/json"}
     )
