@@ -3,8 +3,10 @@ name: High-Quality Automated Publisher
 on:
   workflow_dispatch:
   schedule:
-    # 한국 시간 기준 오전 9시, 오후 9시 무렵 하루 2회 실행
-    - cron: '0 0,12 * * *'
+    # 한국 시간(UTC+9) 기준 약 오전 8시, 오후 2시, 오후 8시 무렵 실행 (UTC 기준 23시, 05시, 11시)
+    - cron: '17 23 * * *'
+    - cron: '42 5 * * *'
+    - cron: '05 11 * * *'
 
 jobs:
   build-and-deploy:
@@ -26,8 +28,8 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-  
-    - name: Run automation script
+
+    - name: Run automation script with Random Sleep
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
@@ -35,6 +37,8 @@ jobs:
         WP_USER: ${{ secrets.WP_USER }}
         WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
       run: |
+        # 사람처럼 보이도록 1초~30분(1800초) 사이의 무작위 대기 후 실행
+        python -c "import time, random; sleep_time = random.randint(1, 1800); print(f'Random delay for {sleep_time} seconds...'); time.sleep(sleep_time)"
         python main.py
 
     - name: Commit posted history
