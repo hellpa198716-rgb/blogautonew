@@ -37,7 +37,7 @@ jobs:
         WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
       run: |
         # 검색 피크 타임 내에서 자연스럽게 보이도록 1초~15분(900초) 사이의 무작위 대기 후 실행
-        python -c "import time, random; sleep_time = random.randint(1, 900); print(f'Random delay for {sleep_time} seconds...'); time.sleep(sleep_time)"
+        python -c "import time, random; sleep_time = random.randint(1, 5); print(f'Random delay for {sleep_time} seconds...'); time.sleep(sleep_time)"
         python main.py
 
     - name: Commit posted history
