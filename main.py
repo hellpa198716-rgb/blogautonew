@@ -1,7 +1,8 @@
 import os
+import random
 import feedparser
 from ai_client import generate_article_data
-from image_service import get_unsplash_image, upload_image_to_wordpress
+from image_service import get_multiple_unsplash_images, upload_image_to_wordpress
 from wordpress import post_to_wordpress
 
 POSTED_URLS_FILE = "posted_urls.txt"
@@ -17,7 +18,6 @@ def save_posted_url(url):
         f.write(f"{url}\n")
 
 def fetch_latest_topics():
-    # 검색 수명이 길고 경쟁률이 낮은 정보형 검색 키워드 타깃 RSS 수집
     rss_urls = [
         "https://news.google.com/rss/search?q=%EC%8B%A0%EC%B2%AD+%EB%B0%A9%EB%B2%95+%EC%9E%90%EA%B2%A9+%ED%99%98%EA%B8%89%EA%B8%88&hl=ko&gl=KR&ceid=KR:ko",
         "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko"
@@ -30,19 +30,51 @@ def fetch_latest_topics():
         
     return entries
 
-def insert_inline_image(content, image_url, alt_text):
-    """첫 번째 <h2> 소제목 바로 위에 고화질 본문 이미지 자연스럽게 배치"""
-    inline_html = f'''
-    <div style="text-align: center; margin: 30px 0;">
-        <img src="{image_url}" alt="{alt_text}" style="max-width: 100%; height: auto; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
-    </div>
-    '''
-    if "<h2>" in content:
-        return content.replace("<h2>", f"{inline_html}\n<h2>", 1)
-    else:
+def insert_multiple_images(content, image_urls, alt_text):
+    """
+    본문 <h2> 소제목을 탐색하여 최대 2~3개의 소제목 위에 이미지를 자연스럽게 분배 배치
+    """
+    if not image_urls:
+        return content
+
+    parts = content.split("<h2>")
+    if len(parts) <= 1:
+        # <h2>가 없는 경우 상단에 1장만 배치
+        inline_html = f'<div style="text-align: center; margin: 30px 0;"><img src="{image_urls[0]}" alt="{alt_text}" style="max-width: 100%; height: auto; border-radius: 10px;" /></div>\n'
         return inline_html + content
 
+    new_content = parts[0]
+    num_h2 = len(parts) - 1
+    
+    # <h2> 개수에 따라 최적의 이미지 배치 위치 선정 (최대 2~3장)
+    if num_h2 <= 2:
+        target_indices = [1]
+    elif num_h2 == 3:
+        target_indices = [1, 3]
+    else:
+        target_indices = [1, 3, 5] if len(image_urls) >= 3 else [1, 3]
+
+    img_idx = 0
+    for i in range(1, len(parts)):
+        if i in target_indices and img_idx < len(image_urls):
+            img_html = f'''
+            <div style="text-align: center; margin: 35px 0 20px 0;">
+                <img src="{image_urls[img_idx]}" alt="{alt_text} - {img_idx+1}" style="max-width: 100%; height: auto; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.12);" />
+            </div>
+            '''
+            new_content += img_html + "<h2>" + parts[i]
+            img_idx += 1
+        else:
+            new_content += "<h2>" + parts[i]
+
+    return new_content
+
 def main():
+    # [하루 1~3회 무작위 발행 제어] 약 33% 확률로 무작위 휴식
+    if random.random() < 0.33:
+        print("자연스러운 발행 패턴 유지를 위해 이번 스케줄은 실행하지 않고 건너뜁니다.")
+        return
+
     posted_urls = load_posted_urls()
     entries = fetch_latest_topics()
 
@@ -68,15 +100,18 @@ def main():
     wp_user = os.getenv("WP_USER")
     wp_password = os.getenv("WP_APP_PASSWORD")
 
-    # 2. 이미지 수집 및 본문 <h2> 위에 배치
+    # 2. 이미지 2~3장 다중 수집 및 소제목 본문 배치
     media_id = None
     search_keyword = article_data.get("search_keyword", "finance")
-    image_url = get_unsplash_image(search_keyword)
+    alt_text = article_data.get("focus_keyword", article_data.get("title", "Guide Image"))
+    
+    image_urls = get_multiple_unsplash_images(search_keyword, count=3)
 
-    if image_url and wp_url:
-        alt_text = article_data.get("focus_keyword", article_data.get("title", "Guide Image"))
-        media_id = upload_image_to_wordpress(image_url, wp_url, wp_user, wp_password, alt_text=alt_text)
-        article_data["content"] = insert_inline_image(article_data["content"], image_url, alt_text)
+    if image_urls and wp_url:
+        # 첫 번째 이미지는 대표 썸네일로 업로드
+        media_id = upload_image_to_wordpress(image_urls[0], wp_url, wp_user, wp_password, alt_text=alt_text)
+        # 본문 <h2> 사이사이에 최대 2~3장 균등 삽입
+        article_data["content"] = insert_multiple_images(article_data["content"], image_urls, alt_text)
 
     # 3. 워드프레스 포스팅 (wordpress.py)
     success = post_to_wordpress(article_data, media_id=media_id)
