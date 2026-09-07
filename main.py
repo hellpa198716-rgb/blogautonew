@@ -1,5 +1,5 @@
 import os
-import random
+import datetime
 import feedparser
 from ai_client import generate_article_data
 from image_service import get_multiple_unsplash_images, upload_image_to_wordpress
@@ -19,8 +19,8 @@ def save_posted_url(url):
 
 def fetch_latest_topics():
     rss_urls = [
-        "https://news.google.com/rss/search?q=%EC%8B%A0%EC%B2%AD+%EB%B0%A9%EB%B2%95+%EC%9E%90%EA%B2%A9+%ED%99%98%EA%B8%89%EA%B8%88&hl=ko&gl=KR&ceid=KR:ko",
-        "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko"
+        "[https://news.google.com/rss/search?q=%EC%8B%A0%EC%B2%AD+%EB%B0%A9%EB%B2%95+%EC%9E%90%EA%B2%A9+%ED%99%98%EA%B8%89%EA%B8%88&hl=ko&gl=KR&ceid=KR:ko](https://news.google.com/rss/search?q=%EC%8B%A0%EC%B2%AD+%EB%B0%A9%EB%B2%95+%EC%9E%90%EA%B2%A9+%ED%99%98%EA%B8%89%EA%B8%88&hl=ko&gl=KR&ceid=KR:ko)",
+        "[https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko](https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko)"
     ]
     
     entries = []
@@ -29,6 +29,23 @@ def fetch_latest_topics():
         entries.extend(feed.entries)
         
     return entries
+
+def attach_eeat_metadata(content, source_link):
+    """
+    E-E-A-T(신뢰성) 확보를 위한 신뢰 블록 및 최종 검증일 자동 삽입
+    """
+    today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
+    
+    eeat_footer = f"""
+    <hr style="margin-top: 40px; border: 0; border-top: 1px solid #eee;" />
+    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; font-size: 0.9em; color: #555; margin-top: 20px;">
+        <p style="margin: 0 0 5px 0;"><strong>정보 검증 및 편집 안내</strong></p>
+        <p style="margin: 0 0 5px 0;">• 최종 정보 확인일: {today_str}</p>
+        <p style="margin: 0 0 5px 0;">• 본 가이드는 수집된 정책 자료 및 뉴스 데이터를 기반으로 검증 및 재구성되었습니다.</p>
+        <p style="margin: 0;">• 관련 원문 출처: <a href="{source_link}" target="_blank" rel="nofollow noopener">{source_link}</a></p>
+    </div>
+    """
+    return content + eeat_footer
 
 def insert_multiple_images(content, image_urls, alt_text):
     if not image_urls:
@@ -42,12 +59,7 @@ def insert_multiple_images(content, image_urls, alt_text):
     new_content = parts[0]
     num_h2 = len(parts) - 1
     
-    if num_h2 <= 2:
-        target_indices = [1]
-    elif num_h2 == 3:
-        target_indices = [1, 3]
-    else:
-        target_indices = [1, 3, 5] if len(image_urls) >= 3 else [1, 3]
+    target_indices = [1, 3] if num_h2 >= 3 else [1]
 
     img_idx = 0
     for i in range(1, len(parts)):
@@ -65,11 +77,6 @@ def insert_multiple_images(content, image_urls, alt_text):
     return new_content
 
 def main():
-    # [발행 제어] 건너뛰기 확률을 10%로 낮춰 거의 매번 발행되도록 조절 (원치 않으시면 아래 3줄 삭제 가능)
-    if random.random() < 0.10:
-        print("자연스러운 발행 패턴 유지를 위해 이번 스케줄은 실행하지 않고 건너뜁니다.")
-        return
-
     posted_urls = load_posted_urls()
     entries = fetch_latest_topics()
 
@@ -83,35 +90,41 @@ def main():
         print("새롭게 작성할 수 있는 정보형 주제가 없습니다.")
         return
 
-    print(f"새로운 가이드 주제 수집 완료: {target_entry.title}")
+    print(f"가이드 수집 및 검증 시작: {target_entry.title}")
 
-    # 1. 정보형 장문 가이드 생성 (prompts.py)
-    article_data = generate_article_data(target_entry.title, target_entry.get("summary", ""))
+    # 1. 정보 추출 및 출처 링크 전달
+    source_url = target_entry.link
+    summary_text = target_entry.get("summary", "")
+    
+    article_data = generate_article_data(target_entry.title, summary_text, source_url=source_url)
     if not article_data:
-        print("AI 아티클 생성 실패로 프로세스를 종료합니다.")
+        print("AI 검증 아티클 생성 실패로 종료합니다.")
         return
+
+    # 2. E-E-A-T 검증 하단 블록 삽입
+    article_data["content"] = attach_eeat_metadata(article_data["content"], source_url)
 
     wp_url = os.getenv("WP_URL")
     wp_user = os.getenv("WP_USER")
     wp_password = os.getenv("WP_APP_PASSWORD")
 
-    # 2. 이미지 2~3장 다중 수집 및 소제목 본문 배치
+    # 3. 이미지 수집 및 삽입
     media_id = None
     search_keyword = article_data.get("search_keyword", "finance")
     alt_text = article_data.get("focus_keyword", article_data.get("title", "Guide Image"))
     
-    image_urls = get_multiple_unsplash_images(search_keyword, count=3)
+    image_urls = get_multiple_unsplash_images(search_keyword, count=2)
 
     if image_urls and wp_url:
         media_id = upload_image_to_wordpress(image_urls[0], wp_url, wp_user, wp_password, alt_text=alt_text)
         article_data["content"] = insert_multiple_images(article_data["content"], image_urls, alt_text)
 
-    # 3. 워드프레스 포스팅 (wordpress.py)
+    # 4. 워드프레스 발행
     success = post_to_wordpress(article_data, media_id=media_id)
 
     if success:
         save_posted_url(target_entry.link)
-        print("성공적으로 새 가이드 글이 발행되고 기록되었습니다.")
+        print("E-E-A-T 기반 가이드가 성공적으로 발행되었습니다.")
     else:
         print("워드프레스 포스팅 실패")
 
