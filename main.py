@@ -31,22 +31,17 @@ def fetch_latest_topics():
     return entries
 
 def insert_multiple_images(content, image_urls, alt_text):
-    """
-    본문 <h2> 소제목을 탐색하여 최대 2~3개의 소제목 위에 이미지를 자연스럽게 분배 배치
-    """
     if not image_urls:
         return content
 
     parts = content.split("<h2>")
     if len(parts) <= 1:
-        # <h2>가 없는 경우 상단에 1장만 배치
         inline_html = f'<div style="text-align: center; margin: 30px 0;"><img src="{image_urls[0]}" alt="{alt_text}" style="max-width: 100%; height: auto; border-radius: 10px;" /></div>\n'
         return inline_html + content
 
     new_content = parts[0]
     num_h2 = len(parts) - 1
     
-    # <h2> 개수에 따라 최적의 이미지 배치 위치 선정 (최대 2~3장)
     if num_h2 <= 2:
         target_indices = [1]
     elif num_h2 == 3:
@@ -70,8 +65,8 @@ def insert_multiple_images(content, image_urls, alt_text):
     return new_content
 
 def main():
-    # [하루 1~3회 무작위 발행 제어] 약 33% 확률로 무작위 휴식
-    if random.random() < 0.33:
+    # [발행 제어] 건너뛰기 확률을 10%로 낮춰 거의 매번 발행되도록 조절 (원치 않으시면 아래 3줄 삭제 가능)
+    if random.random() < 0.10:
         print("자연스러운 발행 패턴 유지를 위해 이번 스케줄은 실행하지 않고 건너뜁니다.")
         return
 
@@ -108,9 +103,7 @@ def main():
     image_urls = get_multiple_unsplash_images(search_keyword, count=3)
 
     if image_urls and wp_url:
-        # 첫 번째 이미지는 대표 썸네일로 업로드
         media_id = upload_image_to_wordpress(image_urls[0], wp_url, wp_user, wp_password, alt_text=alt_text)
-        # 본문 <h2> 사이사이에 최대 2~3장 균등 삽입
         article_data["content"] = insert_multiple_images(article_data["content"], image_urls, alt_text)
 
     # 3. 워드프레스 포스팅 (wordpress.py)
