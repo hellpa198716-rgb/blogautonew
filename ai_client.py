@@ -15,9 +15,9 @@ def generate_article_data(title, summary="", source_url=""):
     system_prompt = get_system_prompt()
     user_prompt = build_user_prompt(title, summary, source_url)
 
-    # Gemini 모델 설정 (JSON 구조화 응답 강제)
+    # Gemini 모델 설정 (실제 존재하는 gemini-1.5-flash 모델로 변경)
     model = genai.GenerativeModel(
-        model_name="gemini-3.6-flash",
+        model_name="gemini-1.5-flash",
         system_instruction=system_prompt,
         generation_config={"response_mime_type": "application/json"}
     )
@@ -30,7 +30,7 @@ def generate_article_data(title, summary="", source_url=""):
 
     except json.JSONDecodeError as e:
         print(f"JSON 파싱 실패: {e}")
-        print(f"원문 응답: {response.text}")
+        print(f"원문 응답: {getattr(response, 'text', '응답 없음')}")
         return None
     except Exception as e:
         print(f"Gemini API 호출 중 오류 발생: {e}")
