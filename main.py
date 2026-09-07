@@ -18,7 +18,6 @@ def save_posted_url(url):
         f.write(f"{url}\n")
 
 def fetch_latest_topics():
-    # URL 순수 주소만 들어가도록 수정되었습니다.
     rss_urls = [
         "https://news.google.com/rss/search?q=%EC%8B%A0%EC%B2%AD+%EB%B0%A9%EB%B2%95+%EC%9E%90%EA%B2%A9+%ED%99%98%EA%B8%89%EA%B8%88&hl=ko&gl=KR&ceid=KR:ko",
         "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko"
@@ -32,9 +31,32 @@ def fetch_latest_topics():
         
     return entries
 
-def attach_eeat_metadata(content, source_link):
+def attach_eeat_metadata(content, source_link, title=""):
     today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
     
+    # 💡 글 제목(title) 키워드 기반으로 1차 출처 분기 처리
+    if any(k in title for k in ["관세", "무역", "통관", "수입", "수출"]):
+        source_name_1 = "관세청(Customs Service) 공식 공고"
+        source_url_1 = "https://www.customs.go.kr"
+        source_name_2 = "미국 관세국경보호청(CBP) / 무역 통상 정보"
+        source_url_2 = "https://www.cbp.gov"
+    elif any(k in title for k in ["지방세", "위택스", "취득세", "재산세", "자동차세"]):
+        source_name_1 = "위택스(WeTax) 지방세 환급 공식 창구"
+        source_url_1 = "https://www.wetax.go.kr"
+        source_name_2 = "정부24 지방세 환급금 신청 안내"
+        source_url_2 = "https://www.gov.kr"
+    elif any(k in title for k in ["국세", "홈택스", "소득세", "부가가치세", "연말정산"]):
+        source_name_1 = "국세청 홈택스(Hometax) 공식 안내"
+        source_url_1 = "https://www.hometax.go.kr"
+        source_name_2 = "정부24 세액 환급 및 조회 서비스"
+        source_url_2 = "https://www.gov.kr"
+    else:
+        # 일반 정책 / 복지 / 금융 / 생활 정보
+        source_name_1 = "정부24(Gov.kr) 정책 정보 서비스"
+        source_url_1 = "https://www.gov.kr"
+        source_name_2 = "대한민국 정책브리핑 공식 발표 자료"
+        source_url_2 = "https://www.korea.kr"
+
     eeat_footer = f"""
     <hr style="margin-top: 40px; border: 0; border-top: 1px solid #eee;" />
     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; font-size: 0.9em; color: #444; margin-top: 30px;">
@@ -43,11 +65,10 @@ def attach_eeat_metadata(content, source_link):
         <p style="margin: 0 0 5px 0;">• <strong>최종 검수일:</strong> {today_str}</p>
         <p style="margin: 0 0 8px 0;">• <strong>자료 검증 및 수집 출처:</strong></p>
         <ul style="margin: 0; padding-left: 20px;">
-            <li><a href="https://www.wetax.go.kr" target="_blank" rel="nofollow noopener">위택스(WeTax) 지방세 환급 공식 창구</a></li>
-            <li><a href="https://www.gov.kr" target="_blank" rel="nofollow noopener">정부24 지방세 환급금 신청 안내</a></li>
-            <li>행정안전부 및 관할 지자체 공식 공고 데이터</li>
+            <li><a href="{source_url_1}" target="_blank" rel="nofollow noopener">{source_name_1}</a></li>
+            <li><a href="{source_url_2}" target="_blank" rel="nofollow noopener">{source_name_2}</a></li>
         </ul>
-        <p style="margin: 10px 0 0 0; font-size: 0.85em; color: #777;">※ 본 가이드는 공식 행정기관 자료를 기초로 2026년 9월 기준 조건을 검증하여 재구성되었습니다.</p>
+        <p style="margin: 10px 0 0 0; font-size: 0.85em; color: #777;">※ 본 가이드는 수집된 공식 행정·정책 데이터를 바탕으로 조건을 검증하여 재구성되었습니다.</p>
     </div>
     """
     return content + eeat_footer
@@ -108,16 +129,20 @@ def main():
         print("AI 검증 아티클 생성 실패로 종료합니다.")
         return
 
-    # 2. E-E-A-T 검증 하단 블록 삽입
-    article_data["content"] = attach_eeat_metadata(article_data["content"], source_url)
+    # 2. E-E-A-T 검증 하단 블록 삽입 (💡 기사 제목을 넘겨주어 출처를 자동으로 분기함)
+    article_data["content"] = attach_eeat_metadata(
+        article_data["content"], 
+        source_url, 
+        title=article_data.get("title", target_entry.title)
+    )
 
     wp_url = os.getenv("WP_URL")
     wp_user = os.getenv("WP_USER")
     wp_password = os.getenv("WP_APP_PASSWORD")
 
-    # 3. 이미지 수집 및 삽입 (실무형 문서/작업 키워드 강화)
+    # 3. 이미지 수집 및 삽입 (실무형 문서/작업 키워드)
     media_id = None
-    raw_keyword = article_data.get("search_keyword", "tax form document")
+    raw_keyword = article_data.get("search_keyword", "official document")
     search_keyword = f"{raw_keyword} document paperwork computer desk"
     alt_text = article_data.get("focus_keyword", article_data.get("title", "Guide Image"))
     
