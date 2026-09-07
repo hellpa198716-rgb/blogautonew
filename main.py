@@ -18,14 +18,16 @@ def save_posted_url(url):
         f.write(f"{url}\n")
 
 def fetch_latest_topics():
+    # URL 순수 주소만 들어가도록 수정되었습니다.
     rss_urls = [
-        "[https://news.google.com/rss/search?q=%EC%8B%A0%EC%B2%AD+%EB%B0%A9%EB%B2%95+%EC%9E%90%EA%B2%A9+%ED%99%98%EA%B8%89%EA%B8%88&hl=ko&gl=KR&ceid=KR:ko](https://news.google.com/rss/search?q=%EC%8B%A0%EC%B2%AD+%EB%B0%A9%EB%B2%95+%EC%9E%90%EA%B2%A9+%ED%99%98%EA%B8%89%EA%B8%88&hl=ko&gl=KR&ceid=KR:ko)",
-        "[https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko](https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko)"
+        "https://news.google.com/rss/search?q=%EC%8B%A0%EC%B2%AD+%EB%B0%A9%EB%B2%95+%EC%9E%90%EA%B2%A9+%ED%99%98%EA%B8%89%EA%B8%88&hl=ko&gl=KR&ceid=KR:ko",
+        "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko"
     ]
     
     entries = []
     for url in rss_urls:
         feed = feedparser.parse(url)
+        print(f"[RSS 수집 결과] {url} -> {len(feed.entries)}개 기사 발견")
         entries.extend(feed.entries)
         
     return entries
@@ -79,6 +81,8 @@ def insert_multiple_images(content, image_urls, alt_text):
 def main():
     posted_urls = load_posted_urls()
     entries = fetch_latest_topics()
+
+    print(f"총 수집된 RSS 기사 수: {len(entries)}개 / 기존 작성된 URL 수: {len(posted_urls)}개")
 
     target_entry = None
     for entry in entries:
